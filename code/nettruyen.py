@@ -17,8 +17,11 @@ from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtQml import QQmlApplicationEngine
 from PyQt5.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QLabel,
                              QLineEdit, QMessageBox, QProgressBar, QPushButton)
+from traceback import format_exc
+import json
 
 HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0",
     'Connection': 'keep-alive',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
     'DNT': '1',
@@ -27,6 +30,7 @@ HEADERS = {
     'Accept-Language': 'en-US,en;q=0.9'
 }
 
+list_error_403 = []
 
 class MangaInfo():
 
@@ -218,7 +222,10 @@ class DownloadEngine(QThread):
         # Get each chapter info
         for index in self.current_manga.list_of_download_chapter:
             chapter_detail = {}
-            chapter_detail['chapter_url'] = self.current_manga.chapter_url_list[index]
+            try:
+                chapter_detail['chapter_url'] = self.current_manga.chapter_url_list[index]
+            except Exception:
+                print('Error get chapter url: ' + str(index))
             chapter_detail['chapter_name'] = self.current_manga.chapter_name_list[index]
             if ':' in chapter_detail['chapter_name']:
                 chapter_detail['chapter_name'] = chapter_detail['chapter_name'].split(':')[
@@ -255,6 +262,10 @@ class DownloadEngine(QThread):
             chapters_403 = ', '.join(self.error403_chapters)
             MessageBox('Can not download some images: ' + chapters_403)
             self.reset_error_403()
+        # Save error 403 to json file
+        if list_error_403:
+            with open(f'{self.current_manga.save_path}/error_403.json', 'w') as f:
+                json.dump(list_error_403, f)
 
         # Update download Finish Dialog
         self.isDone.emit()
@@ -269,19 +280,22 @@ class DownloadEngine(QThread):
 
         for content_url in soup.find('div', class_='reading-detail box_doc').find_all('img'):
             if content_url not in contents:
-                if any(img_fm in content_url['src'] for img_fm in self.image_formats):
+                if content_url.has_attr('src') and any(img_fm in content_url['src'] for img_fm in self.image_formats):
                     img_url = content_url['src']
                 elif content_url.has_attr('data-original'):
                     img_url = content_url['data-original']
                 elif content_url.has_attr('data-cdn') and any(img_fm in content_url['data-cdn'] for img_fm in self.image_formats):
                     img_url = content_url['data-cdn']
+                elif content_url.has_attr('data-src'):
+                    img_url = content_url['data-src']
                 else:
                     img_url = content_url['src']
                 contents.append(self.format_img_url(img_url))
         return contents
 
     def format_img_url(self, url):
-        return url.replace('//', 'http://')
+        # replace if url not start with http
+        return url.replace('https://', '//').replace('http://', '//').replace('//', 'https://')
 
     def get_image_paths(self, chapter_dir_path, contents):
         img_path_list = []
@@ -289,11 +303,8 @@ class DownloadEngine(QThread):
 
         for img_url in contents:
             img_name = img_url.split('/')[-1]
-            if any(img_fm in img_name[-4:] for img_fm in self.image_formats):
-                img_path_name = chapter_dir_path + '/image_' + img_name
-            else:
-                img_path_name = chapter_dir_path + \
-                    '/image_' + '{0:0=3d}'.format(image_index) + '.jpg'
+            img_path_name = chapter_dir_path + \
+                '/image_' + '{0:0=3d}'.format(image_index) + '.jpg'
             img_path_list.append(img_path_name)
             image_index += 1
 
@@ -329,7 +340,8 @@ class DownloadEngine(QThread):
             # Save error chapter
             if self.error403_signal:
                 self.error403_chapters.append(chapter_data['chapter_name'])
-        except Exception:
+        except Exception as e:
+            MessageBox(repr(e))
             MessageBox('Error get chapter info. Please try again later.')
             print('Error Get Chapter Info: ' + chapter_data['chapter_url'])
 
@@ -352,7 +364,12 @@ class DownloadEngine(QThread):
                         with open(img_path_name, 'wb') as handler:
                             handler.write(img_data.content)
                     break
-                except Exception:
+                except Exception as e:
+                    print(format_exc())
+                    list_error_403.append({
+                        'img_url': img_url,
+                        'img_path_name': img_path_name
+                    })
                     if time.time() - start > timeout:
                         MessageBox('Error download image: ' + img_path_name)
                         break
@@ -402,7 +419,7 @@ class Bridge(QObject):
                   self.current_manga.thumbnail)
 
     def format_img_url(self, url):
-        return url.replace('//', 'http://')
+        return url.replace('https://', '//').replace('http://', '//').replace('//', 'https://')
 
     @pyqtSlot(result=str)
     def getMangaName(self):
@@ -508,8 +525,10 @@ class Bridge(QObject):
 
             self.current_manga.thumbnail = soup.find(
                 'div', class_='col-image').find('img')['src']
-            if self.current_manga.thumbnail[3:] != 'http':
+            if self.current_manga.thumbnail[:4] != 'http':
                 self.current_manga.thumbnail = 'http:' + self.current_manga.thumbnail
+            if self.current_manga.thumbnail[:5] != 'https':
+                self.current_manga.thumbnail = 'https' + self.current_manga.thumbnail[4:]
 
             self.current_manga.author = soup.find('li', class_='author').find(
                 'p', class_='col-xs-8').string
@@ -532,9 +551,11 @@ class Bridge(QObject):
             self.current_manga.lastest_chapter = manga_lastest_chapter
 
             self.current_manga.description = soup.find(
-                'div', class_='detail-content').find('p').text
+                'div', class_='detail-content').find('div').text
+            
+            block_chapter = soup.find('ul', id='desc')
             self.current_manga.chapter_name_list = [
-                i.find('a').text for i in soup.find_all('div', class_='chapter')]
+                i.find('a').text for i in block_chapter.find_all('div', class_='chapter')]
 
             chapter_url_list = []
             for chapter in soup.find('div', id='nt_listchapter').find('ul').find_all('a'):
