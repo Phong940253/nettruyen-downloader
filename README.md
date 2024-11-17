@@ -20,9 +20,9 @@
     ·
     <a href="#how-to-use">View Demo</a>
     ·
-    <a href="https://github.com/quantrancse/nettruyen-downloader-minimal">Minimal Version</a>
+    <a href="https://github.com/quantrancse/nettruyen-downloader-minimal">Minimal Version (Older)</a>
     ·
-    <a href="https://github.com/quantrancse/nettruyen-downloader-script">Script Version</a>
+    <a href="https://github.com/quantrancse/nettruyen-downloader-script">Script Version (Older)</a>
   </p>
 </p>
 
@@ -65,7 +65,7 @@ Thanks to the author and use it by your own way.
 * Update new chapters or download missing chapters of an already downloaded manga.
 * Download images by multithreading to speed up.
 * Keep original image format if possible.
-* Working with [NhatTruyen](http://nhattruyenmin.com/) or some manga redirect to [NhatTruyen](http://nhattruyenmin.com/)
+* Working with [NetTruyenViet](https://nettruyenviet.com/) or some manga redirect to [NetTruyenViet](https://nettruyenviet.com/)
 
 ##### Recommend Manga Viewer
 
@@ -74,9 +74,7 @@ Thanks to the author and use it by your own way.
 <!-- Download -->
 ## Download
 
-**Windows**: [nettruyen_downloader.exe ~ 50MB](https://rebrand.ly/nettruyen-downloader)
-
-**Windows**: [nettruyen_minimal.exe ~ 35MB](https://rebrand.ly/nettruyen_minimal)
+**Windows**: [nettruyen_downloader.exe ~ 68MB](https://github.com/Phong940253/nettruyen-downloader/releases/download/v1.2.3/nettruyen_downloader.exe)
 
 <!-- USAGE EXAMPLES -->
 ## How To Use
