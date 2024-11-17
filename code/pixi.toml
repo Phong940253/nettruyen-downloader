@@ -1,0 +1,21 @@
+[project]
+authors = ["Phong <phong940253@gmail.com>"]
+channels = ["conda-forge"]
+description = "Add a short description here"
+name = "code"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.12.7,<4"
+requests = ">=2.32.3,<3"
+bs4 = ">=4.12.3,<5"
+pyqt = ">=5.15.9,<6"
+pyinstaller = ">=6.11.1,<7"
+tqdm = ">=4.67.0,<5"
+black = ">=24.10.0,<25"
+
+[pypi-dependencies]
+cloudscraper = "*"
