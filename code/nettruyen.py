@@ -60,7 +60,7 @@ class MangaInfo:
         self.viewed = ""
         self.description = ""
         self.last_updated = ""
-        self.lastest_chapter = ""
+        self.latest_chapter = ""
         self.chapter_name_list = []
         self.chapter_url_list = []
         self.save_path = ""
@@ -505,7 +505,7 @@ class Bridge(QObject):
 
     @pyqtSlot(result=str)
     def get_manga_last_chapter(self):
-        return self.current_manga.lastest_chapter
+        return self.current_manga.latest_chapter
 
     @pyqtSlot(result=list)
     def get_chapter_list(self):
@@ -582,80 +582,86 @@ class Bridge(QObject):
             )
             soup = BeautifulSoup(request.text, "html.parser")
 
+            # Extract manga name
             title_detail = soup.find("h1", class_="title-detail")
             if title_detail:
-                self.current_manga.manga_name = title_detail.text
+                self.current_manga.manga_name = title_detail.text.strip()
             else:
-                raise Exception("Error in crawling manga name!")
+                raise ValueError("Error in crawling manga name!")
 
+            # Extract thumbnail
             col_image_div = soup.find("div", class_="col-image")
             img_tag = col_image_div.find("img") if col_image_div else None
             if img_tag and isinstance(img_tag, Tag) and img_tag.has_attr("src"):
-                self.current_manga.thumbnail = str(img_tag["src"])
+                self.current_manga.thumbnail = str(img_tag["src"]).strip()
             else:
                 self.current_manga.thumbnail = ""
-            if self.current_manga.thumbnail[:4] != "http":
+            if self.current_manga.thumbnail and not self.current_manga.thumbnail.startswith("http"):
                 self.current_manga.thumbnail = "http:" + self.current_manga.thumbnail
-            if self.current_manga.thumbnail[:5] != "https":
-                self.current_manga.thumbnail = (
-                    "https" + self.current_manga.thumbnail[4:]
-                )
+            if self.current_manga.thumbnail.startswith("http:"):
+                self.current_manga.thumbnail = "https" + self.current_manga.thumbnail[4:]
 
-            self.current_manga.author = (
-                soup.find("li", class_="author").find("p", class_="col-xs-8").string
-            )
+            # Extract author
+            author_tag = soup.find("li", class_="author")
+            if author_tag:
+                author_p = author_tag.find("p", class_="col-xs-8")
+                self.current_manga.author = author_p.string.strip() if author_p else ""
 
-            categories_list = [
-                x.string
-                for x in soup.find("li", class_="kind")
-                .find("p", class_="col-xs-8")
-                .find_all("a")
-            ]
-            s = " - "
-            self.current_manga.categories = s.join(categories_list)
+            # Extract categories
+            categories_tag = soup.find("li", class_="kind")
+            if categories_tag:
+                category_links = categories_tag.find("p", class_="col-xs-8").find_all("a")
+                categories_list = [x.string.strip() for x in category_links if x.string]
+                self.current_manga.categories = " - ".join(categories_list)
 
-            self.current_manga.viewed = (
-                soup.find("ul", class_="list-info")
-                .find_all("li", class_="row")[-1]
-                .find("p", class_="col-xs-8")
-                .text
-            )
-            self.current_manga.last_updated = soup.find(
-                "time", class_="small"
-            ).string.strip()[15:-1]
+            # Extract views
+            viewed_tag = soup.find("ul", class_="list-info")
+            if viewed_tag:
+                row_items = viewed_tag.find_all("li", class_="row")
+                viewed_p = row_items[-1].find("p", class_="col-xs-8") if row_items else None
+                self.current_manga.viewed = viewed_p.text.strip() if viewed_p else ""
 
-            manga_lastest_chapter = (
-                soup.find("div", id="nt_listchapter")
-                .find_all("li")[1]
-                .find("div", class_="chapter")
-                .find("a")
-                .text
-            )
-            if ":" in manga_lastest_chapter:
-                manga_lastest_chapter = manga_lastest_chapter.split(":")[0]
-            self.current_manga.lastest_chapter = manga_lastest_chapter
+            # Extract last updated
+            time_tag = soup.find("time", class_="small")
+            if time_tag:
+                self.current_manga.last_updated = time_tag.string.strip()[15:-1]
 
-            self.current_manga.description = (
-                soup.find("div", class_="detail-content").find("div").text
-            )
+            # Extract latest chapter
+            chapter_div = soup.find("div", id="nt_listchapter")
+            if chapter_div:
+                latest_chapter_tag = chapter_div.find_all("li")[1].find("div", class_="chapter").find("a")
+                manga_latest_chapter = latest_chapter_tag.text.strip() if latest_chapter_tag else ""
+                if ":" in manga_latest_chapter:
+                    manga_latest_chapter = manga_latest_chapter.split(":")[0]
+                self.current_manga.latest_chapter = manga_latest_chapter
 
+            # Extract description
+            detail_content_div = soup.find("div", class_="detail-content")
+            if detail_content_div:
+                description_div = detail_content_div.find("div")
+                self.current_manga.description = description_div.text.strip() if description_div else ""
+
+            # Extract chapter names
             block_chapter = soup.find("ul", id="desc")
-            self.current_manga.chapter_name_list = [
-                i.find("a").text
-                for i in block_chapter.find_all("div", class_="chapter")
-            ]
+            if block_chapter:
+                self.current_manga.chapter_name_list = [
+                    i.find("a").text.strip()
+                    for i in block_chapter.find_all("div", class_="chapter")
+                ]
 
+            # Extract chapter URLs
             chapter_url_list = []
-            for chapter in (
-                soup.find("div", id="nt_listchapter").find("ul").find_all("a")
-            ):
-                chapter_url_list.append(chapter["href"])
+            chapter_ul = soup.find("div", id="nt_listchapter").find("ul")
+            if chapter_ul:
+                for chapter in chapter_ul.find_all("a"):
+                    if chapter.has_attr("href"):
+                        chapter_url_list.append(chapter["href"].strip())
             self.current_manga.chapter_url_list = chapter_url_list
 
         except Exception as e:
+            print(f"Exception occurred while crawling manga: {repr(e)}")
+            # Replace MessageBox call with print or logging if GUI isn't available
             MessageBox(repr(e))
-            # MessageBox("Error in crawling manga data!")
-            print("exception crawling manga !")
 
 
 def resource_path(relative_path):
