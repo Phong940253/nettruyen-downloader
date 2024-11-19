@@ -299,8 +299,9 @@ class DownloadEngine(QThread):
             self.reset_error_403()
         # Save error 403 to json file
         if list_error_403:
-            with open(f"{self.current_manga.save_path}/error_403.json", "w") as f:
-                json.dump(list_error_403, f)
+            # process with unicode language
+            with open(f"{self.current_manga.save_path}/error_403.json", "w", encoding="utf-8") as f:
+                json.dump(list_error_403, f, ensure_ascii=False)
 
         # Update download Finish Dialog
         self.isDone.emit()
@@ -312,10 +313,10 @@ class DownloadEngine(QThread):
 
     def get_image_urls(self, soup):
         contents = []
+        # Get image urls
+        list_img = soup.select("div.reading-detail.box_doc>div.page-chapter>img")
 
-        for content_url in soup.find("div", class_="reading-detail box_doc").find_all(
-            "img"
-        ):
+        for content_url in list_img:
             if content_url not in contents:
                 if content_url.has_attr("src") and any(
                     img_fm in content_url["src"] for img_fm in self.image_formats
