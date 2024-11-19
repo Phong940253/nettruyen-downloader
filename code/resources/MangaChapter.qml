@@ -76,6 +76,26 @@ PageBackground {
     }
 
     RoundButton {
+        id: fixErrorButton
+        x: 296
+        y: 420
+        width: 150
+        height: 60
+        radius: 5
+        text: qsTr("Fix Error")
+        anchors.right: downloadButton.left
+        anchors.rightMargin: 25
+        highlighted: true
+        font.bold: true
+        font.pointSize: 9
+        font.family: "Verdana"
+
+        onClicked: {
+            folderDialogDownloadErrorChapter.open()
+        }
+    }
+
+    RoundButton {
         id: downloadButton
         x: 543
         y: 420
@@ -139,6 +159,14 @@ PageBackground {
        title: "Please choose save folder"
        onAccepted: {
            con.download_chapter(folderDialogDownloadAllChapter.folder, ["all"])
+       }
+   }
+
+   FolderDialog{
+       id: folderDialogDownloadErrorChapter
+       title: "Please choose save folder"
+       onAccepted: {
+            con.download_error_chapter(folderDialogDownloadErrorChapter.folder)
        }
    }
 

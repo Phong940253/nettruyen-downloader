@@ -549,6 +549,58 @@ class Bridge(QObject):
             self.current_manga.list_of_download_chapter = sorted(list_of_chapters)
 
         return self.current_manga.list_of_download_chapter
+    
+    def download_error_image(self, img):
+        start = time.time()
+        timeout = 10
+        while True:
+                img_url = img["img_url"]
+                img_path_name = img["img_path_name"]
+                try:
+                    img_data = self.scraper.get(img_url, headers=HEADERS, timeout=10)
+                    if img_data.status_code == 403:
+                        list_error_403.append(img)
+                    else:
+                        with open(img_path_name, "wb") as handler:
+                            handler.write(img_data.content)
+                    break
+                except Exception as e:
+                    print(format_exc())
+                    if time.time() - start > timeout:
+                        list_error_403.append(img)
+                        break
+                    print("Retry: download image: " + img_url)
+                    time.sleep(1)
+                    continue
+    
+    @pyqtSlot(str)
+    def download_error_chapter(self, input_str):
+        path = input_str[8:] + "/" + self.current_manga.manga_name
+        path = (
+            path.replace('"', "").replace("'", "").replace("?", "").replace("!", "")
+        )
+        
+        if not isdir(path):
+            MessageBox("Can not find the path to save error 403 images.")
+            return
+        
+        with open(f"{path}/error_403.json", "r", encoding="utf-8") as f:
+            error_403 = json.load(f)
+            
+        if not error_403:
+            MessageBox("No error 403 images to download.")
+            return
+        
+        list_error_403 = []
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            executor.map(self.download_error_image, error_403)
+            
+        if list_error_403 and len(list_error_403) < len(error_403) and len(list_error_403) > 0:
+            with open(f"{path}/error_403.json", "w", encoding="utf-8") as f:
+                json.dump(list_error_403, f, ensure_ascii=False)
+        
+        MessageBox("Download error 403 images done.")
+            
 
     @pyqtSlot(str, list)
     def download_chapter(self, input_str, list_of_chapters):
