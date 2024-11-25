@@ -447,17 +447,21 @@ class Bridge(QObject):
             browser={"browser": "firefox", "platform": "windows", "mobile": False},
             sess=self.session,
         )
-        if any(x in input_str for x in ["nhattruyen", "nettruyen"]):
-            try:
-                request = self.scraper.get(input_str, headers=HEADERS, timeout=10)
-                soup = BeautifulSoup(request.text, "html.parser")
-                if soup.find("div", id="nt_listchapter"):
-                    self.current_manga.manga_url = str(input_str)
-                    self.crawl_manga_home_page()
-                    page = "MangaPage.qml"
-            except Exception:
-                MessageBox("Error in connect manga page. Please try again.")
-                print("Error in connect manga page !")
+        # if any(x in input_str for x in ["nhattruyen", "nettruyen"]):
+        try:
+            request = self.scraper.get(input_str, headers=HEADERS, timeout=10)
+            soup = BeautifulSoup(request.text, "html.parser")
+            if soup.find("div", id="nt_listchapter"):
+                self.current_manga.manga_url = str(input_str)
+                self.crawl_manga_home_page()
+                page = "MangaPage.qml"
+            else:
+                # print pretty html
+                print(soup.prettify())
+        except Exception:
+            MessageBox("Error in connect manga page. Please try again.")
+            print("Error in connect manga page !")
+            
         return page
 
     @pyqtSlot(result=str)
@@ -598,8 +602,11 @@ class Bridge(QObject):
         if list_error_403 and len(list_error_403) < len(error_403) and len(list_error_403) > 0:
             with open(f"{path}/error_403.json", "w", encoding="utf-8") as f:
                 json.dump(list_error_403, f, ensure_ascii=False)
-        
-        MessageBox("Download error 403 images done.")
+            MessageBox("Download error 403 images done with some errors.")
+        else:
+            if os.path.exists(f"{path}/error_403.json"):
+                os.remove(f"{path}/error_403.json")
+            MessageBox("Download error 403 images done.")
             
 
     @pyqtSlot(str, list)
@@ -689,18 +696,38 @@ class Bridge(QObject):
                 self.current_manga.latest_chapter = manga_latest_chapter
 
             # Extract description
-            detail_content_div = soup.find("div", class_="detail-content")
-            if detail_content_div:
-                description_div = detail_content_div.find("div")
-                self.current_manga.description = description_div.text.strip() if description_div else ""
+            try:
+                detail_content_div = soup.find_all("div", class_="detail-content")
+                if detail_content_div and len(detail_content_div) > 1:
+                    description_div = detail_content_div[1]
+                    # search div has text-align: justify;
+                    description_div = description_div.find("div", style="text-align: justify;")
+                    
+                    # find h2 tag and extract h2 second tag and all next tags
+                    h2_tag = description_div.find_all("h2")
+                    if h2_tag and len(h2_tag) > 1:
+                        h2_tag = h2_tag[1]
+                        self.current_manga.description = h2_tag.text.strip()
+                        next_tag = h2_tag.find_next_sibling()
+                        while next_tag and next_tag.name != "hr" and next_tag.name != "h2":
+                            self.current_manga.description += "\n" + next_tag.text.strip()
+                            next_tag = next_tag.find_next_sibling()
+                    else:
+                        self.current_manga.description = description_div.text.strip()
+            except Exception as e:
+                print("Error in crawling manga description: ", repr(e))
+                self.current_manga.description = ""
 
             # Extract chapter names
             block_chapter = soup.find("ul", id="desc")
-            if block_chapter:
-                self.current_manga.chapter_name_list = [
-                    i.find("a").text.strip()
-                    for i in block_chapter.find_all("div", class_="chapter")
-                ]
+            if not block_chapter:
+                block_chapter = soup.select_one("nav>ul")
+            # print(block_chapter)
+                
+            self.current_manga.chapter_name_list = [
+                i.find("a").text.strip()
+                for i in block_chapter.find_all("div", class_="chapter")
+            ]
 
             # Extract chapter URLs
             chapter_url_list = []
