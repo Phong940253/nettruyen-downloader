@@ -74,7 +74,7 @@ Thanks to the author and use it by your own way.
 <!-- Download -->
 ## Download
 
-**Windows**: [nettruyen_downloader.exe ~ 68MB](https://github.com/Phong940253/nettruyen-downloader/releases/download/v1.2.3/nettruyen_downloader.exe)
+**Windows**: [nettruyen_downloader.exe ~ 68MB](https://github.com/Phong940253/nettruyen-downloader/releases/latest/download/nettruyen_downloader.exe)
 
 <!-- USAGE EXAMPLES -->
 ## How To Use
